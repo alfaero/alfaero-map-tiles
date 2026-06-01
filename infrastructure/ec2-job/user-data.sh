@@ -58,7 +58,7 @@ set -x
 # ----- deps -----
 apt-get update
 apt-get install -y --no-install-recommends \
-    curl ca-certificates jq unzip git rclone awscli
+    curl ca-certificates jq unzip git rclone awscli aria2
 
 # go-pmtiles
 PMTILES_VERSION="v1.22.0"

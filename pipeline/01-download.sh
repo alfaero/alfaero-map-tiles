@@ -47,9 +47,20 @@ SIZE_BYTES=$(curl -sIfL "$PMTILES_URL" | awk -v IGNORECASE=1 '/^content-length:/
 SIZE_GB=$((SIZE_BYTES / 1024 / 1024 / 1024))
 echo "[01] Downloading $PMTILES_URL (~${SIZE_GB} GB)..."
 
-# Baixa direto como nosso planet pmtiles (já no formato certo, sem conversão necessária)
-curl -fL --retry 3 --retry-delay 30 \
-    -o "$WORKDIR/$PMTILES_NAME" \
+# Usar aria2c (resume + multi-conexão + retry) em vez de curl
+# curl quebra em HTTP/2 stream errors no meio de downloads grandes
+aria2c \
+    --max-connection-per-server=8 \
+    --split=8 \
+    --max-tries=10 \
+    --retry-wait=30 \
+    --continue=true \
+    --auto-file-renaming=false \
+    --allow-overwrite=true \
+    --console-log-level=warn \
+    --summary-interval=30 \
+    --out="$PMTILES_NAME" \
+    --dir="$WORKDIR" \
     "$PMTILES_URL"
 
 # Validação básica
