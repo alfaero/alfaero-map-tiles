@@ -3,10 +3,11 @@
 # Vars substituídas via templatefile():
 #   $${secret_arn}, $${aws_region}, $${sns_topic}, $${git_repo}, $${git_branch}
 
-set -uo pipefail
-# NOTA: -e removido propositalmente — controle de erro feito via STATUS e cleanup via trap
+set -o pipefail
+# NOTA: -e e -u removidos durante debug — queremos rodar até o fim pra capturar todo erro
 
 exec > >(tee /var/log/alfaero-pipeline.log | logger -t alfaero-pipeline -s 2>/dev/console) 2>&1
+echo "=== USER-DATA START $(date -u +%FT%TZ) ==="
 
 STATUS="UNKNOWN"
 INSTANCE_ID="unknown"
@@ -36,9 +37,14 @@ cleanup() {
         --message "Pipeline $${STATUS} (exit=$${exit_code}) on $${INSTANCE_ID}. Log: s3://alfaero-map-tiles/$${log_name}" \
         2>/dev/null || echo "WARN: SNS publish failed"
 
-    # Aguarda 60s antes de terminar (pra capturar console output AWS)
-    echo "Sleeping 60s before terminate..."
-    sleep 60
+    # Em failure, mantém instância viva 30 min pra debug (console output captura + SSM/SSH)
+    if [[ "$${STATUS}" == "SUCCESS" ]]; then
+        echo "SUCCESS — terminating in 60s"
+        sleep 60
+    else
+        echo "FAILURE — keeping instance alive 30 min for debugging (terminate manually if needed)"
+        sleep 1800
+    fi
 
     aws ec2 terminate-instances \
         --instance-ids "$${INSTANCE_ID}" \
