@@ -1,0 +1,23 @@
+name = "alfaero-tiles-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-02"
+minify = true
+account_id = "fd93a1d728c6d167cb0bb93a1ed584df"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "alfaero-map-tiles"
+preview_bucket_name = "alfaero-map-tiles"
+
+[vars]
+ALLOWED_ORIGINS = "*"
+CACHE_CONTROL = "public, max-age=86400"
+# PMTILES_PATH templating not needed — we want clients to ask for /tiles/{z}/{x}/{y}.mvt
+# and worker maps it to planet-2026w23.pmtiles. We use a simple alias.
+PMTILES_PATH = "planet-2026w23.pmtiles"
+PUBLIC_HOSTNAME = "tiles.alfaero.com"
+
+# Route: tiles.alfaero.com/tiles/* → este worker
+[[routes]]
+pattern = "tiles.alfaero.com/tiles/*"
+zone_name = "alfaero.com"

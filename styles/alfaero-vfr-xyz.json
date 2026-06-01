@@ -1,0 +1,266 @@
+{
+  "version": 8,
+  "name": "Alfaero VFR XYZ",
+  "metadata": {
+    "alfaero:variant": "vfr",
+    "alfaero:version": "0.1.0",
+    "alfaero:purpose": "Aeronautical VFR base map — terrain emphasized, urban areas muted",
+    "alfaero:source": "xyz"
+  },
+  "center": [
+    -46.6,
+    -23.5
+  ],
+  "zoom": 6,
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": [
+        "https://tiles.alfaero.com/tiles/planet-2026w23/{z}/{x}/{y}.mvt"
+      ],
+      "minzoom": 0,
+      "maxzoom": 14,
+      "attribution": "© <a href=\"https://www.openstreetmap.org/copyright\">OSM</a> © <a href=\"https://openmaptiles.org\">OMT</a>"
+    }
+  },
+  "glyphs": "https://tiles.alfaero.com/fonts/{fontstack}/{range}.pbf",
+  "sprite": "https://tiles.alfaero.com/sprites/alfaero/alfaero",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f0e4c8"
+      }
+    },
+    {
+      "id": "landcover-wood",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": [
+        "==",
+        "class",
+        "wood"
+      ],
+      "paint": {
+        "fill-color": "#c8d8a0"
+      }
+    },
+    {
+      "id": "landcover-grass",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": [
+        "==",
+        "class",
+        "grass"
+      ],
+      "paint": {
+        "fill-color": "#dde9b8"
+      }
+    },
+    {
+      "id": "landcover-glacier",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": [
+        "==",
+        "subclass",
+        "glacier"
+      ],
+      "paint": {
+        "fill-color": "#ffffff",
+        "fill-opacity": 0.7
+      }
+    },
+    {
+      "id": "landcover-sand",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": [
+        "==",
+        "class",
+        "sand"
+      ],
+      "paint": {
+        "fill-color": "#f5e6b8"
+      }
+    },
+    {
+      "id": "landuse-residential",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": [
+        "==",
+        "class",
+        "residential"
+      ],
+      "paint": {
+        "fill-color": "#e8d8a8",
+        "fill-opacity": 0.6
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#8fb6d8"
+      }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "paint": {
+        "line-color": "#8fb6d8",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.5,
+          16,
+          2.5
+        ]
+      }
+    },
+    {
+      "id": "road-motorway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "motorway"
+      ],
+      "paint": {
+        "line-color": "#aa4a2a",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          5,
+          0.5,
+          18,
+          8
+        ],
+        "line-opacity": 0.6
+      }
+    },
+    {
+      "id": "aeroway-runway",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "aeroway",
+      "filter": [
+        "==",
+        "class",
+        "runway"
+      ],
+      "minzoom": 9,
+      "paint": {
+        "fill-color": "#5a3a2a"
+      }
+    },
+    {
+      "id": "aeroway-taxiway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "aeroway",
+      "filter": [
+        "in",
+        "class",
+        "taxiway"
+      ],
+      "minzoom": 11,
+      "paint": {
+        "line-color": "#5a3a2a",
+        "line-width": 1
+      }
+    },
+    {
+      "id": "boundary-country",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "filter": [
+        "==",
+        "admin_level",
+        2
+      ],
+      "paint": {
+        "line-color": "#7a5a3a",
+        "line-width": 1.5,
+        "line-dasharray": [
+          4,
+          2
+        ]
+      }
+    },
+    {
+      "id": "place-city",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "filter": [
+        "in",
+        "class",
+        "city",
+        "town"
+      ],
+      "minzoom": 5,
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name:latin"
+          ],
+          [
+            "get",
+            "name"
+          ]
+        ],
+        "text-font": [
+          "Noto Sans Bold"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          5,
+          10,
+          14,
+          16
+        ],
+        "text-transform": "uppercase"
+      },
+      "paint": {
+        "text-color": "#5a3a2a",
+        "text-halo-color": "#f0e4c8",
+        "text-halo-width": 1.5
+      }
+    }
+  ]
+}
