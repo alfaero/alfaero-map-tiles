@@ -1,14 +1,52 @@
 #!/bin/bash
-# user-data do EC2 spot do pipeline.
+# user-data do EC2 do pipeline alfaero-map-tiles.
 # Vars substituídas via templatefile():
 #   $${secret_arn}, $${aws_region}, $${sns_topic}, $${git_repo}, $${git_branch}
-# (mostrado escapado pro comentário não confundir o parser do Terraform)
 
-set -euo pipefail
+set -uo pipefail
+# NOTA: -e removido propositalmente — controle de erro feito via STATUS e cleanup via trap
 
 exec > >(tee /var/log/alfaero-pipeline.log | logger -t alfaero-pipeline -s 2>/dev/console) 2>&1
 
-# trace habilitado SÓ pra operações sem credenciais (apt, downloads públicos)
+STATUS="UNKNOWN"
+INSTANCE_ID="unknown"
+
+cleanup() {
+    local exit_code=$?
+    set +x
+    echo "=== CLEANUP (exit_code=$${exit_code}, STATUS=$${STATUS}) ==="
+
+    INSTANCE_ID=$(curl -sS http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "unknown")
+    local log_name="logs/$(date -u +%Y%m%dT%H%M%SZ)-$${INSTANCE_ID}-$${STATUS}.log"
+
+    # Upload do log pro R2 (best effort)
+    if command -v rclone >/dev/null && [[ -f /root/.config/rclone/rclone.conf ]]; then
+        rclone copyto /var/log/alfaero-pipeline.log "alfaero:alfaero-map-tiles/$${log_name}" \
+            --header-upload "Content-Type: text/plain" 2>/dev/null || \
+            echo "WARN: rclone upload failed"
+    else
+        echo "WARN: rclone not configured, log NOT uploaded"
+    fi
+
+    # SNS notification (best effort)
+    aws sns publish \
+        --topic-arn "${sns_topic}" \
+        --region "${aws_region}" \
+        --subject "alfaero-map-tiles pipeline $${STATUS}" \
+        --message "Pipeline $${STATUS} (exit=$${exit_code}) on $${INSTANCE_ID}. Log: s3://alfaero-map-tiles/$${log_name}" \
+        2>/dev/null || echo "WARN: SNS publish failed"
+
+    # Aguarda 60s antes de terminar (pra capturar console output AWS)
+    echo "Sleeping 60s before terminate..."
+    sleep 60
+
+    aws ec2 terminate-instances \
+        --instance-ids "$${INSTANCE_ID}" \
+        --region "${aws_region}" \
+        2>/dev/null || shutdown -h now
+}
+trap cleanup EXIT
+
 set -x
 
 # ----- deps -----
@@ -23,12 +61,12 @@ curl -L "https://github.com/protomaps/go-pmtiles/releases/download/$${PMTILES_VE
     | tar xz -C /usr/local/bin pmtiles
 chmod +x /usr/local/bin/pmtiles
 
-# ----- credenciais via Secrets Manager (trace OFF pra não logar) -----
+# ----- credenciais via Secrets Manager (trace OFF) -----
 set +x
 SECRETS=$(aws secretsmanager get-secret-value \
     --secret-id "${secret_arn}" \
     --region "${aws_region}" \
-    --query SecretString --output text)
+    --query SecretString --output text) || { STATUS="FAILED_SECRETS"; exit 10; }
 
 export R2_ACCESS_KEY_ID=$(echo "$${SECRETS}" | jq -r .R2_ACCESS_KEY_ID)
 export R2_SECRET_ACCESS_KEY=$(echo "$${SECRETS}" | jq -r .R2_SECRET_ACCESS_KEY)
@@ -41,7 +79,7 @@ export SLACK_WEBHOOK_URL=$(echo "$${SECRETS}" | jq -r '.SLACK_WEBHOOK_URL // ""'
 GITHUB_PAT=$(echo "$${SECRETS}" | jq -r '.GITHUB_PAT // ""')
 unset SECRETS
 
-# Configurar rclone pra log upload funcionar mesmo em failure precoce
+# Configurar rclone CEDO pra log upload funcionar mesmo se pipeline falhar
 mkdir -p /root/.config/rclone
 cat > /root/.config/rclone/rclone.conf <<RCLONE_EOF
 [alfaero]
@@ -59,27 +97,12 @@ no_auth = true
 RCLONE_EOF
 chmod 600 /root/.config/rclone/rclone.conf
 
-# ----- clone do repo (com ou sem PAT) -----
-cd /opt
-if [[ -n "$${GITHUB_PAT}" && "$${GITHUB_PAT}" != "null" ]]; then
-    # private repo: usa credential helper temporário (não loga o PAT)
-    GIT_ASKPASS_FILE=$(mktemp)
-    chmod 700 "$${GIT_ASKPASS_FILE}"
-    cat > "$${GIT_ASKPASS_FILE}" <<EOF
-#!/bin/bash
-echo "$${GITHUB_PAT}"
-EOF
-    chmod +x "$${GIT_ASKPASS_FILE}"
-    GIT_ASKPASS="$${GIT_ASKPASS_FILE}" GIT_TERMINAL_PROMPT=0 \
-        git clone --depth 1 --branch "${git_branch}" \
-        "$$(echo '${git_repo}' | sed 's|https://|https://x-access-token@|')" alfaero-map-tiles
-    rm -f "$${GIT_ASKPASS_FILE}"
-else
-    # public repo
-    git clone --depth 1 --branch "${git_branch}" "${git_repo}" alfaero-map-tiles
-fi
-unset GITHUB_PAT
 set -x
+
+# ----- clone do repo (público — sem PAT) -----
+cd /opt
+git clone --depth 1 --branch "${git_branch}" "${git_repo}" alfaero-map-tiles || { STATUS="FAILED_CLONE"; exit 20; }
+unset GITHUB_PAT
 
 # ----- prepara workdir -----
 mkdir -p /work
@@ -89,38 +112,8 @@ chmod 755 /work
 cd /opt/alfaero-map-tiles
 chmod +x pipeline/*.sh
 
-if WORKDIR=/work bash pipeline/run-update.sh; then
+if WORKDIR=/work HOME=/root bash pipeline/run-update.sh; then
     STATUS="SUCCESS"
 else
-    STATUS="FAILED"
+    STATUS="FAILED_PIPELINE"
 fi
-
-# ----- upload do log pro R2 (debug) -----
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-LOG_NAME="logs/$(date -u +%Y%m%dT%H%M%SZ)-$${INSTANCE_ID}-$${STATUS:-UNKNOWN}.log"
-# rclone pode não estar configurado se falhou cedo demais, então usar aws cli direto via curl pra R2
-# fallback safe: sempre tenta upload, mas não bloqueia se falhar
-if command -v rclone >/dev/null && [[ -n "$${R2_ACCESS_KEY_ID:-}" ]]; then
-    rclone copyto /var/log/alfaero-pipeline.log "alfaero:$${R2_BUCKET}/$${LOG_NAME}" \
-        --header-upload "Content-Type: text/plain" || true
-fi
-
-# ----- notifica via SNS -----
-aws sns publish \
-    --topic-arn "${sns_topic}" \
-    --region "${aws_region}" \
-    --subject "alfaero-map-tiles pipeline $${STATUS:-UNKNOWN}" \
-    --message "Pipeline $${STATUS:-UNKNOWN} on $${INSTANCE_ID}.
-
-Log uploaded to: s3://$${R2_BUCKET:-alfaero-map-tiles}/$${LOG_NAME}
-(Access via: rclone cat alfaero:$${R2_BUCKET:-alfaero-map-tiles}/$${LOG_NAME})
-
-Or browse Cloudflare R2 dashboard: alfaero-map-tiles → $${LOG_NAME}" \
-    || true
-
-# ----- self-destruct (60s pra capturar console output AWS) -----
-sleep 60
-aws ec2 terminate-instances \
-    --instance-ids "$${INSTANCE_ID}" \
-    --region "${aws_region}" \
-    || shutdown -h now

@@ -133,13 +133,16 @@ resource "aws_launch_template" "pipeline" {
     }
   }
 
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      max_price          = "0.50"
-      spot_instance_type = "one-time"
-    }
-  }
+  # Spot desabilitado: capacity esgotada em us-east-1 c6i.4xlarge.
+  # Pra job de ~4h roda em on-demand (~$3 por execução vs $1 spot).
+  # Reativar quando capacity voltar:
+  # instance_market_options {
+  #   market_type = "spot"
+  #   spot_options {
+  #     max_price          = "0.50"
+  #     spot_instance_type = "one-time"
+  #   }
+  # }
 
   tag_specifications {
     resource_type = "instance"
