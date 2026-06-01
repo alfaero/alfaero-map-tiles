@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
-# Converte planet.mbtiles → planet-{week}.pmtiles via go-pmtiles.
+# 02-convert.sh — NO-OP desde 2026-06-01.
+#
+# OpenFreeMap agora distribui pmtiles diretamente em
+#   https://btrfs.openfreemap.com/areas/planet/{version}/tiles.pmtiles
+#
+# Então 01-download.sh já baixa no formato final, e este script vira nada.
+# Mantido pra retro-compatibilidade caso queiramos voltar a converter de mbtiles.
 set -euo pipefail
 
-: "${WEEK:?WEEK env required}"
 : "${PMTILES_NAME:?PMTILES_NAME env required}"
 
 WORKDIR="${WORKDIR:-/work}"
 cd "$WORKDIR"
 
-if [[ ! -f planet.mbtiles ]]; then
-    echo "[02] ERROR: planet.mbtiles not found in $WORKDIR" >&2
+if [[ ! -f "$PMTILES_NAME" ]]; then
+    echo "[02] ERROR: $PMTILES_NAME not found in $WORKDIR" >&2
     exit 2
 fi
 
-echo "[02] Converting mbtiles → pmtiles (this takes ~1-2h)..."
+echo "[02] No conversion needed (OpenFreeMap distributes pmtiles directly)"
+echo "[02] Pre-existing $PMTILES_NAME — skipping conversion"
 
-# pmtiles CLI baixado no user-data do EC2
-pmtiles convert planet.mbtiles "$PMTILES_NAME"
-
-# Sanity check
-pmtiles show "$PMTILES_NAME" > "${PMTILES_NAME}.metadata.txt"
-echo "[02] Metadata:"
-cat "${PMTILES_NAME}.metadata.txt"
-
-SIZE_GB=$(du -BG "$PMTILES_NAME" | cut -f1)
-echo "[02] Created $PMTILES_NAME ($SIZE_GB)"
-
-# Liberar espaço — não precisamos mais do mbtiles
-rm -f planet.mbtiles
-echo "[02] Freed mbtiles"
+# Sanity check rápido
+pmtiles show "$PMTILES_NAME" > "${PMTILES_NAME}.metadata.txt" 2>&1 || {
+    echo "[02] WARN: pmtiles show failed — file may be corrupted"
+    head -20 "${PMTILES_NAME}.metadata.txt"
+}
+echo "[02] Metadata first 5 lines:"
+head -5 "${PMTILES_NAME}.metadata.txt"

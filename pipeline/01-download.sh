@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Baixa o MBTiles mais recente do OpenFreeMap (R2 público, sem auth).
+# Baixa o pmtiles mais recente do OpenFreeMap diretamente via HTTPS.
+# OpenFreeMap distribui em https://btrfs.openfreemap.com/areas/planet/{version}/tiles.pmtiles
 set -euo pipefail
 
 : "${WEEK:?WEEK env required}"
@@ -8,44 +9,58 @@ WORKDIR="${WORKDIR:-/work}"
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 
-OFM_ENDPOINT="${OFM_R2_ENDPOINT:-https://4ddd8b88c1ea4b4ba84c33b8b30b62ac.r2.cloudflarestorage.com}"
-OFM_BUCKET="${OFM_BUCKET:-openfreemap}"
+OFM_BASE="${OFM_BASE:-https://btrfs.openfreemap.com}"
 
-# Configura rclone (perfil read-only sem auth pro R2 público do OFM)
-mkdir -p "${HOME:-/root}/.config/rclone"
-cat > "${HOME:-/root}/.config/rclone/rclone.conf" <<EOF
-[ofm]
-type = s3
-provider = Cloudflare
-endpoint = $OFM_ENDPOINT
-no_auth = true
+echo "[01] Fetching version index from $OFM_BASE/files.txt..."
 
-[alfaero]
-type = s3
-provider = Cloudflare
-endpoint = $R2_ENDPOINT
-access_key_id = $R2_ACCESS_KEY_ID
-secret_access_key = $R2_SECRET_ACCESS_KEY
-EOF
+# files.txt lista todos os arquivos de todas as versões. Extrair só versões e pegar a mais recente.
+LATEST_VERSION=$(curl -sSfL "$OFM_BASE/files.txt" \
+    | grep -oP 'areas/planet/\K[0-9]{8}_[0-9]{6}_pt' \
+    | sort -u | tail -n 1)
 
-echo "[01] Listing OpenFreeMap bucket to find latest mbtiles..."
-LATEST=$(rclone lsf "ofm:$OFM_BUCKET/" --include 'planet-*.mbtiles' | sort | tail -n 1)
-
-if [[ -z "$LATEST" ]]; then
-    echo "[01] ERROR: no mbtiles found in ofm:$OFM_BUCKET" >&2
+if [[ -z "$LATEST_VERSION" ]]; then
+    echo "[01] ERROR: could not parse latest version from $OFM_BASE/files.txt" >&2
     exit 2
 fi
 
-echo "[01] Latest: $LATEST"
-echo "[01] Downloading (this takes ~30-60 min depending on bandwidth)..."
+echo "[01] Latest version: $LATEST_VERSION"
 
-rclone copy "ofm:$OFM_BUCKET/$LATEST" "$WORKDIR/" \
-    --progress \
-    --transfers 8 \
-    --checkers 16 \
-    --multi-thread-streams 4
+# Verificar que pmtiles existe pra essa versão (algumas versões podem não ter)
+PMTILES_URL="$OFM_BASE/areas/planet/$LATEST_VERSION/tiles.pmtiles"
+if ! curl -sIfL "$PMTILES_URL" >/dev/null; then
+    echo "[01] WARN: pmtiles not available for $LATEST_VERSION, trying previous versions..."
+    PREV_VERSIONS=$(curl -sSfL "$OFM_BASE/files.txt" \
+        | grep -oP 'areas/planet/\K[0-9]{8}_[0-9]{6}_pt' \
+        | sort -ur | head -n 5)
+    for v in $PREV_VERSIONS; do
+        if curl -sIfL "$OFM_BASE/areas/planet/$v/tiles.pmtiles" >/dev/null; then
+            LATEST_VERSION="$v"
+            PMTILES_URL="$OFM_BASE/areas/planet/$v/tiles.pmtiles"
+            echo "[01] Found pmtiles in: $v"
+            break
+        fi
+    done
+fi
 
-mv "$WORKDIR/$LATEST" "$WORKDIR/planet.mbtiles"
+# Tamanho esperado
+SIZE_BYTES=$(curl -sIfL "$PMTILES_URL" | awk -v IGNORECASE=1 '/^content-length:/ {gsub("\r",""); print $2}')
+SIZE_GB=$((SIZE_BYTES / 1024 / 1024 / 1024))
+echo "[01] Downloading $PMTILES_URL (~${SIZE_GB} GB)..."
 
-SIZE_GB=$(du -BG "$WORKDIR/planet.mbtiles" | cut -f1)
-echo "[01] Downloaded planet.mbtiles ($SIZE_GB)"
+# Baixa direto como nosso planet pmtiles (já no formato certo, sem conversão necessária)
+curl -fL --retry 3 --retry-delay 30 \
+    -o "$WORKDIR/$PMTILES_NAME" \
+    "$PMTILES_URL"
+
+# Validação básica
+ACTUAL_SIZE=$(stat -c%s "$WORKDIR/$PMTILES_NAME")
+if [[ "$ACTUAL_SIZE" -lt 1000000000 ]]; then
+    echo "[01] ERROR: downloaded file too small (${ACTUAL_SIZE} bytes), expected >1GB" >&2
+    exit 3
+fi
+
+ACTUAL_GB=$((ACTUAL_SIZE / 1024 / 1024 / 1024))
+echo "[01] Downloaded $PMTILES_NAME (${ACTUAL_GB} GB) — source: $LATEST_VERSION"
+
+# Exporta variável pra ser usada na etapa de notificação/styles
+echo "$LATEST_VERSION" > "$WORKDIR/.source_version"
