@@ -4,9 +4,12 @@
 #   $${secret_arn}, $${aws_region}, $${sns_topic}, $${git_repo}, $${git_branch}
 # (mostrado escapado pro comentário não confundir o parser do Terraform)
 
-set -euxo pipefail
+set -euo pipefail
 
 exec > >(tee /var/log/alfaero-pipeline.log | logger -t alfaero-pipeline -s 2>/dev/console) 2>&1
+
+# trace habilitado SÓ pra operações sem credenciais (apt, downloads públicos)
+set -x
 
 # ----- deps -----
 apt-get update
@@ -20,7 +23,8 @@ curl -L "https://github.com/protomaps/go-pmtiles/releases/download/$${PMTILES_VE
     | tar xz -C /usr/local/bin pmtiles
 chmod +x /usr/local/bin/pmtiles
 
-# ----- credenciais via Secrets Manager -----
+# ----- credenciais via Secrets Manager (trace OFF pra não logar) -----
+set +x
 SECRETS=$(aws secretsmanager get-secret-value \
     --secret-id "${secret_arn}" \
     --region "${aws_region}" \
@@ -34,13 +38,30 @@ export CF_API_TOKEN=$(echo "$${SECRETS}" | jq -r .CF_API_TOKEN)
 export CF_ZONE_ID_ALFAERO=$(echo "$${SECRETS}" | jq -r .CF_ZONE_ID_ALFAERO)
 export TILES_DOMAIN=$(echo "$${SECRETS}" | jq -r .TILES_DOMAIN)
 export SLACK_WEBHOOK_URL=$(echo "$${SECRETS}" | jq -r '.SLACK_WEBHOOK_URL // ""')
-GITHUB_PAT=$(echo "$${SECRETS}" | jq -r .GITHUB_PAT)
+GITHUB_PAT=$(echo "$${SECRETS}" | jq -r '.GITHUB_PAT // ""')
+unset SECRETS
 
-# ----- clone do repo (private — usa PAT) -----
+# ----- clone do repo (com ou sem PAT) -----
 cd /opt
-GIT_URL_WITH_AUTH=$(echo "${git_repo}" | sed "s|https://|https://x-access-token:$${GITHUB_PAT}@|")
-git clone --depth 1 --branch "${git_branch}" "$${GIT_URL_WITH_AUTH}" alfaero-map-tiles
-unset GITHUB_PAT GIT_URL_WITH_AUTH
+if [[ -n "$${GITHUB_PAT}" && "$${GITHUB_PAT}" != "null" ]]; then
+    # private repo: usa credential helper temporário (não loga o PAT)
+    GIT_ASKPASS_FILE=$(mktemp)
+    chmod 700 "$${GIT_ASKPASS_FILE}"
+    cat > "$${GIT_ASKPASS_FILE}" <<EOF
+#!/bin/bash
+echo "$${GITHUB_PAT}"
+EOF
+    chmod +x "$${GIT_ASKPASS_FILE}"
+    GIT_ASKPASS="$${GIT_ASKPASS_FILE}" GIT_TERMINAL_PROMPT=0 \
+        git clone --depth 1 --branch "${git_branch}" \
+        "$$(echo '${git_repo}' | sed 's|https://|https://x-access-token@|')" alfaero-map-tiles
+    rm -f "$${GIT_ASKPASS_FILE}"
+else
+    # public repo
+    git clone --depth 1 --branch "${git_branch}" "${git_repo}" alfaero-map-tiles
+fi
+unset GITHUB_PAT
+set -x
 
 # ----- prepara workdir -----
 mkdir -p /work
