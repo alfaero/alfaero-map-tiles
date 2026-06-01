@@ -1,0 +1,14 @@
+{
+  "name": "alfaero-tileserver-admin-daemon",
+  "version": "1.0.0",
+  "description": "Admin daemon pra registrar/unregistrar mbtiles no TileServer GL — chamado pelo alfaero-backoffice",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0"
+  }
+}

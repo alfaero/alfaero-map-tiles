@@ -9,12 +9,15 @@ services:
       - ./config.json:/data/config.json:ro
       - ./styles:/data/styles:ro
       - ./sprites:/data/sprites:ro
+      - ./mbtiles:/data/mbtiles:ro
     command: --config /data/config.json --no-cors
     # Sem mbtiles local — styles apontam pro Worker XYZ (tiles.alfaero.com/tiles/...)
     # TileServer GL renderiza MVT→PNG e cacheia em memória
     environment:
       - PORT=8080
       - MAX_SCALE_FACTOR=2
+      - UV_THREADPOOL_SIZE=16
+      - NODE_OPTIONS=--max-old-space-size=2048
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/styles/alfaero-day/0/0/0.png"]
       interval: 30s

@@ -1,0 +1,18 @@
+[Unit]
+Description=Alfaero TileServer Admin Daemon
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/alfaero-tileserver/admin-daemon
+ExecStart=/usr/bin/node /opt/alfaero-tileserver/admin-daemon/server.js
+Restart=always
+RestartSec=5
+User=root
+EnvironmentFile=/opt/alfaero-tileserver/admin-daemon/.env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
