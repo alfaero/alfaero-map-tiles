@@ -1,0 +1,25 @@
+{
+  "options": {
+    "paths": {
+      "root": "/data",
+      "styles": "styles",
+      "fonts": "/usr/src/app/node_modules/tileserver-gl-styles/fonts",
+      "sprites": "/data/sprites"
+    },
+    "domains": [],
+    "serveAllStyles": false,
+    "serveStaticMaps": false
+  },
+  "styles": {
+    "alfaero-day": {
+      "style": "alfaero-day-xyz.json"
+    },
+    "alfaero-night": {
+      "style": "alfaero-night-xyz.json"
+    },
+    "alfaero-vfr": {
+      "style": "alfaero-vfr-xyz.json"
+    }
+  },
+  "data": {}
+}

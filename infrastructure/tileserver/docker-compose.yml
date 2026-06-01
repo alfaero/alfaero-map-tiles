@@ -1,0 +1,23 @@
+services:
+  tileserver:
+    image: maptiler/tileserver-gl:v5.2.0
+    container_name: alfaero-tileserver
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8006:8080"
+    volumes:
+      - ./config.json:/data/config.json:ro
+      - ./styles:/data/styles:ro
+      - ./sprites:/data/sprites:ro
+    command: --config /data/config.json --no-cors
+    # Sem mbtiles local — styles apontam pro Worker XYZ (tiles.alfaero.com/tiles/...)
+    # TileServer GL renderiza MVT→PNG e cacheia em memória
+    environment:
+      - PORT=8080
+      - MAX_SCALE_FACTOR=2
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/styles/alfaero-day/0/0/0.png"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
