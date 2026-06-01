@@ -7,10 +7,13 @@ node_modules/
 .terraform/
 .terraform.lock.hcl
 terraform.tfstate*
+tfplan
+*.tfplan
 *.tfvars
 !terraform.tfvars.example
 .DS_Store
 *.swp
+.vscode/
 dist/
 build/
 fonts/*.pbf

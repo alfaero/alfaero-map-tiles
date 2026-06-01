@@ -12,13 +12,8 @@ terraform {
     }
   }
 
-  backend "s3" {
-    # Configure via -backend-config ou backend.hcl
-    # bucket   = "alfaero-terraform-state"
-    # key      = "map-tiles/terraform.tfstate"
-    # region   = "us-east-1"
-    # encrypt  = true
-  }
+  # Backend local por enquanto. Migrar pra S3 depois com:
+  #   backend "s3" { bucket = "alfaero-terraform-state"; key = "map-tiles/terraform.tfstate"; region = "us-east-1"; encrypt = true }
 }
 
 provider "cloudflare" {

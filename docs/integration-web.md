@@ -26,8 +26,8 @@ const map = new maplibregl.Map({
   zoom: 10,
 });
 
-// Atribuição (já vem do style, mas pode customizar):
-map.addControl(new maplibregl.AttributionControl({ compact: false }));
+// Atribuição collapsed (ícone "ⓘ" que expande no toque):
+map.addControl(new maplibregl.AttributionControl({ compact: true }));
 map.addControl(new maplibregl.NavigationControl());
 ```
 

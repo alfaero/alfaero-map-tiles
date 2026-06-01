@@ -17,93 +17,29 @@ resource "cloudflare_record" "tiles_cname" {
   comment = "Map tiles via R2 (alfaero-map-tiles)"
 }
 
-# Cache rule: .pmtiles imutáveis (TTL 1 ano edge+browser)
-resource "cloudflare_ruleset" "tiles_cache" {
-  zone_id     = var.cloudflare_zone_id_alfaero
-  name        = "alfaero-map-tiles cache rules"
-  description = "Cache rules pro subdomínio tiles.alfaero.com"
-  kind        = "zone"
-  phase       = "http_request_cache_settings"
+# Cache rules — gerenciadas FORA do Terraform.
+#
+# Motivo: o zone alfaero.com já tem ruleset http_request_cache_settings em uso
+# por outros serviços (ex: maps.alfaero.com), e Cloudflare permite apenas 1
+# ruleset por phase + zone. Importar via Terraform falha por incompatibilidade
+# do provider v4 com a Rulesets API. Gerenciamento via script API direta em
+# infrastructure/cache-rules/.
+#
+# Rules ativas no zone (ruleset ffbda96c4812447b95fdd2f10a29868a):
+#   1. Cache Tiles MapTile (pré-existente, maps.alfaero.com)
+#   2. tiles.alfaero.com .pmtiles → TTL 1 ano + respect strong etags
+#   3. tiles.alfaero.com /styles/* → TTL 5 min
+#   4. tiles.alfaero.com /sprites/, /fonts/ → TTL 30 dias
+#
+# Pra atualizar:
+#   bash infrastructure/cache-rules/apply.sh
+#
+# Cache Reserve (opcional) → ativar manual no dashboard se quiser:
+#   Cloudflare → R2 → alfaero-map-tiles → Settings → Object Lifecycle → Cache Reserve
 
-  rules {
-    description = "Long TTL for .pmtiles"
-    expression  = "(http.host eq \"${var.tiles_domain}\") and (http.request.uri.path matches \".*\\\\.pmtiles$\")"
-    action      = "set_cache_settings"
-
-    action_parameters {
-      cache = true
-
-      edge_ttl {
-        mode    = "override_origin"
-        default = 31536000 # 1 ano
-      }
-
-      browser_ttl {
-        mode    = "override_origin"
-        default = 31536000
-      }
-
-      cache_reserve {
-        eligible = true
-        min_file_size = 1048576 # 1 MB
-      }
-
-      respect_strong_etags = true
-    }
-
-    enabled = true
-  }
-
-  rules {
-    description = "Short TTL for styles/* (mutable)"
-    expression  = "(http.host eq \"${var.tiles_domain}\") and (starts_with(http.request.uri.path, \"/styles/\"))"
-    action      = "set_cache_settings"
-
-    action_parameters {
-      cache = true
-
-      edge_ttl {
-        mode    = "override_origin"
-        default = 300 # 5 min
-      }
-
-      browser_ttl {
-        mode    = "override_origin"
-        default = 300
-      }
-    }
-
-    enabled = true
-  }
-
-  rules {
-    description = "Long TTL for sprites/* and fonts/*"
-    expression  = "(http.host eq \"${var.tiles_domain}\") and (starts_with(http.request.uri.path, \"/sprites/\") or starts_with(http.request.uri.path, \"/fonts/\"))"
-    action      = "set_cache_settings"
-
-    action_parameters {
-      cache = true
-
-      edge_ttl {
-        mode    = "override_origin"
-        default = 2592000 # 30 dias
-      }
-
-      browser_ttl {
-        mode    = "override_origin"
-        default = 2592000
-      }
-    }
-
-    enabled = true
-  }
-}
-
-# Tiered Cache (Smart) — POPs menores buscam em POP grande antes do R2
-resource "cloudflare_tiered_cache" "smart" {
-  zone_id    = var.cloudflare_zone_id_alfaero
-  cache_type = "smart"
-}
+# Tiered Cache (Smart) — habilitar MANUALMENTE no dashboard:
+#   Cloudflare → alfaero.com → Caching → Tiered Cache → Smart Tiered Caching → Enable
+# (provider Cloudflare v4 não suporta sem permissão extra Cache Settings, mais simples manual)
 
 output "r2_bucket_name" {
   value = cloudflare_r2_bucket.tiles.name
