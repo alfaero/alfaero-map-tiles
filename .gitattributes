@@ -1,0 +1,18 @@
+# Enforce LF on scripts and config — these run on Linux (EC2 spot)
+*.sh        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.tf        text eol=lf
+*.hcl       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+.env*       text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+LICENSE     text eol=lf
+
+# Binary
+*.png       binary
+*.pbf       binary
+*.pmtiles   binary
+*.mbtiles   binary

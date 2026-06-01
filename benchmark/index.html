@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>alfaero-map-tiles benchmark</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <style>
+    html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; }
+    #panel {
+      position: absolute; top: 12px; left: 12px; z-index: 10;
+      background: rgba(255,255,255,0.95); padding: 12px 14px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 13px; min-width: 260px;
+    }
+    #panel h3 { margin: 0 0 8px; font-size: 14px; }
+    #panel button { margin: 2px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+    .stat { display: flex; justify-content: space-between; margin: 2px 0; }
+    .stat .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .style-toggle { display: flex; gap: 4px; margin: 6px 0; }
+    .style-toggle button.active { background: #FF6B35; color: white; border-color: #FF6B35; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="panel">
+    <h3>Alfaero Map Tiles — benchmark</h3>
+    <div class="style-toggle">
+      <button data-style="alfaero-day" class="active">Day</button>
+      <button data-style="alfaero-night">Night</button>
+      <button data-style="alfaero-vfr">VFR</button>
+    </div>
+    <div class="stat"><span>Tiles loaded:</span> <span class="v" id="tilesLoaded">0</span></div>
+    <div class="stat"><span>Tile errors:</span> <span class="v" id="tilesError">0</span></div>
+    <div class="stat"><span>Avg load time:</span> <span class="v" id="avgLoad">– ms</span></div>
+    <div class="stat"><span>P95 load time:</span> <span class="v" id="p95Load">– ms</span></div>
+    <div class="stat"><span>Last fetch:</span> <span class="v" id="lastFetch">–</span></div>
+    <hr />
+    <button onclick="goTo([-46.6, -23.5], 12)">SP</button>
+    <button onclick="goTo([-43.2, -22.9], 12)">RJ</button>
+    <button onclick="goTo([-47.9, -15.8], 12)">BSB</button>
+    <button onclick="goTo([-60.0, -3.1], 12)">Manaus</button>
+    <button onclick="goTo([-49.3, -25.4], 12)">CWB</button>
+    <button onclick="goTo([2.35, 48.85], 12)">Paris</button>
+    <button onclick="goTo([-74.0, 40.7], 12)">NYC</button>
+    <button onclick="goTo([139.7, 35.7], 12)">Tóquio</button>
+    <button onclick="resetStats()">Reset</button>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
+  <script>
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+
+    const TILES_HOST = window.location.search.includes('host=')
+      ? new URLSearchParams(window.location.search).get('host')
+      : 'tiles.alfaero.com';
+
+    const loadTimes = [];
+    let tilesLoaded = 0;
+    let tilesError = 0;
+    const pending = new Map();
+
+    const origFetch = window.fetch;
+    window.fetch = async function(input, init) {
+      const url = typeof input === 'string' ? input : input.url;
+      const start = performance.now();
+      try {
+        const res = await origFetch(input, init);
+        const dur = performance.now() - start;
+        if (url.includes('.pmtiles') || url.includes('/styles/') || url.includes('/sprites/') || url.includes('/fonts/')) {
+          loadTimes.push(dur);
+          tilesLoaded++;
+          document.getElementById('lastFetch').textContent = `${url.split('/').pop().substring(0,30)} (${dur.toFixed(0)} ms)`;
+          updateStats();
+        }
+        return res;
+      } catch (e) {
+        tilesError++;
+        updateStats();
+        throw e;
+      }
+    };
+
+    function updateStats() {
+      document.getElementById('tilesLoaded').textContent = tilesLoaded;
+      document.getElementById('tilesError').textContent = tilesError;
+      if (loadTimes.length) {
+        const avg = loadTimes.reduce((a,b) => a+b, 0) / loadTimes.length;
+        const sorted = [...loadTimes].sort((a,b) => a-b);
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+        document.getElementById('avgLoad').textContent = avg.toFixed(0) + ' ms';
+        document.getElementById('p95Load').textContent = p95.toFixed(0) + ' ms';
+      }
+    }
+
+    function resetStats() {
+      loadTimes.length = 0;
+      tilesLoaded = 0;
+      tilesError = 0;
+      updateStats();
+    }
+
+    let currentStyle = 'alfaero-day';
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: `https://${TILES_HOST}/styles/${currentStyle}.json`,
+      center: [-46.6, -23.5],
+      zoom: 4,
+      hash: true
+    });
+    map.addControl(new maplibregl.NavigationControl());
+    map.addControl(new maplibregl.AttributionControl({ compact: false }));
+
+    document.querySelectorAll('.style-toggle button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.style-toggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentStyle = btn.dataset.style;
+        map.setStyle(`https://${TILES_HOST}/styles/${currentStyle}.json`);
+        resetStats();
+      };
+    });
+
+    function goTo(center, zoom) {
+      map.flyTo({ center, zoom, duration: 2000 });
+    }
+    window.goTo = goTo;
+    window.resetStats = resetStats;
+  </script>
+</body>
+</html>

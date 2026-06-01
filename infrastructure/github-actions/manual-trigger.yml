@@ -1,0 +1,29 @@
+name: Manual pipeline trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual trigger'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::954222311704:role/github-actions-alfaero-map-tiles
+          aws-region: us-east-1
+
+      - name: Start Step Function
+        run: |
+          aws stepfunctions start-execution \
+            --state-machine-arn arn:aws:states:us-east-1:954222311704:stateMachine:alfaero-map-tiles-weekly-update \
+            --input "{\"reason\":\"${{ inputs.reason }}\",\"triggered_by\":\"${{ github.actor }}\"}"

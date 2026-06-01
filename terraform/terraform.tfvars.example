@@ -1,0 +1,6 @@
+cloudflare_api_token       = "REPLACE_ME"
+cloudflare_account_id      = "REPLACE_ME"
+cloudflare_zone_id_alfaero = "REPLACE_ME"
+aws_profile                = "alfaero"
+aws_region                 = "us-east-1"
+slack_webhook_url          = ""
