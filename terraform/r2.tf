@@ -5,17 +5,9 @@ resource "cloudflare_r2_bucket" "tiles" {
   location   = "WNAM" # Western North America (closer to BR than EU/APAC; auto-routed via CF)
 }
 
-# DNS CNAME tiles.alfaero.com → R2 public domain
-# (R2 custom domain é configurado via dashboard ou API; aqui só o DNS).
-resource "cloudflare_record" "tiles_cname" {
-  zone_id = var.cloudflare_zone_id_alfaero
-  name    = "tiles"
-  type    = "CNAME"
-  content = "${var.r2_bucket_name}.${var.cloudflare_account_id}.r2.cloudflarestorage.com"
-  proxied = true
-  ttl     = 1
-  comment = "Map tiles via R2 (alfaero-map-tiles)"
-}
+# DNS CNAME tiles.alfaero.com é gerenciado pelo R2 Custom Domain
+# (configurado via dashboard ou API ao conectar o domínio ao bucket).
+# Aponta pra "public.r2.dev" e R2 mantém atualizado conforme necessário.
 
 # Cache rules — gerenciadas FORA do Terraform.
 #

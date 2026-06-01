@@ -136,7 +136,7 @@ resource "aws_launch_template" "pipeline" {
   instance_market_options {
     market_type = "spot"
     spot_options {
-      max_price          = "0.30"
+      max_price          = "0.50"
       spot_instance_type = "one-time"
     }
   }
