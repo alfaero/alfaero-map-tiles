@@ -12,8 +12,8 @@ OFM_ENDPOINT="${OFM_R2_ENDPOINT:-https://4ddd8b88c1ea4b4ba84c33b8b30b62ac.r2.clo
 OFM_BUCKET="${OFM_BUCKET:-openfreemap}"
 
 # Configura rclone (perfil read-only sem auth pro R2 público do OFM)
-mkdir -p "$HOME/.config/rclone"
-cat > "$HOME/.config/rclone/rclone.conf" <<EOF
+mkdir -p "${HOME:-/root}/.config/rclone"
+cat > "${HOME:-/root}/.config/rclone/rclone.conf" <<EOF
 [ofm]
 type = s3
 provider = Cloudflare
