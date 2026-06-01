@@ -26,6 +26,7 @@ RESPONSE=$(curl -sS -X POST \
 if echo "$RESPONSE" | grep -q '"success":true'; then
     echo "[05] Purge OK"
 else
-    echo "[05] ERROR: $RESPONSE" >&2
-    exit 4
+    echo "[05] WARN: purge failed (non-fatal — Cache-Control TTL kicks in eventually):"
+    echo "       $RESPONSE"
+    # NÃO faz exit — purge falhou mas tiles e styles já estão no R2 corretamente
 fi
