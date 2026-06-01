@@ -41,6 +41,24 @@ export SLACK_WEBHOOK_URL=$(echo "$${SECRETS}" | jq -r '.SLACK_WEBHOOK_URL // ""'
 GITHUB_PAT=$(echo "$${SECRETS}" | jq -r '.GITHUB_PAT // ""')
 unset SECRETS
 
+# Configurar rclone pra log upload funcionar mesmo em failure precoce
+mkdir -p /root/.config/rclone
+cat > /root/.config/rclone/rclone.conf <<RCLONE_EOF
+[alfaero]
+type = s3
+provider = Cloudflare
+endpoint = $${R2_ENDPOINT}
+access_key_id = $${R2_ACCESS_KEY_ID}
+secret_access_key = $${R2_SECRET_ACCESS_KEY}
+
+[ofm]
+type = s3
+provider = Cloudflare
+endpoint = https://4ddd8b88c1ea4b4ba84c33b8b30b62ac.r2.cloudflarestorage.com
+no_auth = true
+RCLONE_EOF
+chmod 600 /root/.config/rclone/rclone.conf
+
 # ----- clone do repo (com ou sem PAT) -----
 cd /opt
 if [[ -n "$${GITHUB_PAT}" && "$${GITHUB_PAT}" != "null" ]]; then
@@ -77,17 +95,31 @@ else
     STATUS="FAILED"
 fi
 
-# ----- notifica via SNS -----
+# ----- upload do log pro R2 (debug) -----
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+LOG_NAME="logs/$(date -u +%Y%m%dT%H%M%SZ)-$${INSTANCE_ID}-$${STATUS:-UNKNOWN}.log"
+# rclone pode não estar configurado se falhou cedo demais, então usar aws cli direto via curl pra R2
+# fallback safe: sempre tenta upload, mas não bloqueia se falhar
+if command -v rclone >/dev/null && [[ -n "$${R2_ACCESS_KEY_ID:-}" ]]; then
+    rclone copyto /var/log/alfaero-pipeline.log "alfaero:$${R2_BUCKET}/$${LOG_NAME}" \
+        --header-upload "Content-Type: text/plain" || true
+fi
+
+# ----- notifica via SNS -----
 aws sns publish \
     --topic-arn "${sns_topic}" \
     --region "${aws_region}" \
-    --subject "alfaero-map-tiles pipeline $${STATUS}" \
-    --message "Pipeline $${STATUS} on $${INSTANCE_ID}. See /var/log/alfaero-pipeline.log on the instance." \
+    --subject "alfaero-map-tiles pipeline $${STATUS:-UNKNOWN}" \
+    --message "Pipeline $${STATUS:-UNKNOWN} on $${INSTANCE_ID}.
+
+Log uploaded to: s3://$${R2_BUCKET:-alfaero-map-tiles}/$${LOG_NAME}
+(Access via: rclone cat alfaero:$${R2_BUCKET:-alfaero-map-tiles}/$${LOG_NAME})
+
+Or browse Cloudflare R2 dashboard: alfaero-map-tiles → $${LOG_NAME}" \
     || true
 
-# ----- self-destruct -----
-sleep 30
+# ----- self-destruct (60s pra capturar console output AWS) -----
+sleep 60
 aws ec2 terminate-instances \
     --instance-ids "$${INSTANCE_ID}" \
     --region "${aws_region}" \
