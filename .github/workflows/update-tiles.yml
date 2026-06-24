@@ -36,7 +36,7 @@ jobs:
       CF_ZONE_ID_ALFAERO: ${{ secrets.CF_ZONE_ID_ALFAERO }}
       TILES_DOMAIN: ${{ secrets.TILES_DOMAIN }}
       OFM_VERSION: ${{ github.event.inputs.version }}
-      WORKDIR: ${{ runner.temp }}/tiles
+      WORKDIR: ${{ github.workspace }}/work
     steps:
       - uses: actions/checkout@v4
 
