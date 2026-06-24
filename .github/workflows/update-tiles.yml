@@ -1,0 +1,76 @@
+name: update-tiles
+
+# Atualiza o planet PMTiles copiando OpenFreeMap R2 → R2 da Alfaero, SEM AWS.
+# Substitui o pipeline de EC2 spot (que custava ~$30/mês de egress AWS).
+# Repo público → minutos de Actions grátis e ilimitados; banda do runner não é cobrada.
+#
+# Secrets necessários (Settings → Secrets and variables → Actions):
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET,
+#   CF_API_TOKEN, CF_ZONE_ID_ALFAERO, TILES_DOMAIN
+# (mesmos valores do secret AWS alfaero/map-tiles-pipeline).
+
+on:
+  schedule:
+    - cron: "0 7 1 * *" # 1º dia do mês, 07:00 UTC (04:00 BRT) — mensal
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão do OpenFreeMap (vazio = última disponível)"
+        required: false
+        default: ""
+
+concurrency:
+  group: update-tiles
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ZONE_ID_ALFAERO: ${{ secrets.CF_ZONE_ID_ALFAERO }}
+      TILES_DOMAIN: ${{ secrets.TILES_DOMAIN }}
+      OFM_VERSION: ${{ github.event.inputs.version }}
+      WORKDIR: ${{ runner.temp }}/tiles
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone remotes
+        run: |
+          mkdir -p ~/.config/rclone "$WORKDIR"
+          umask 177
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [alfaero]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${R2_ACCESS_KEY_ID}
+          secret_access_key = ${R2_SECRET_ACCESS_KEY}
+          endpoint = ${R2_ENDPOINT}
+          acl = private
+
+          [ofm]
+          type = http
+          url = https://btrfs.openfreemap.com
+          EOF
+
+      - name: Sync planet (OpenFreeMap R2 → Alfaero R2, no AWS)
+        run: bash pipeline/rclone-sync.sh
+
+      - name: Publish styles
+        run: bash pipeline/04-publish-style.sh
+
+      - name: Purge CDN (styles)
+        run: bash pipeline/05-purge-cdn.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Tiles ${PMTILES_NAME:-?} publicado em https://${TILES_DOMAIN}/ (versao ${VERSION:-?})"
