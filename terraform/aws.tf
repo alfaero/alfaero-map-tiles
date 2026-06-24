@@ -220,14 +220,15 @@ resource "aws_sfn_state_machine" "weekly_update" {
   })
 }
 
-# EventBridge cron: 1º Domingo do mês 04:00 BRT = 07:00 UTC.
-# Mensal (não semanal): o mapa base OSM muda devagar e cada run sobe ~83 GB pro R2
-# (egress AWS ~$0.09/GB). Mensal corta ~75% do egress (~$22/mês). Ver
-# ../alfaero-map-tiles_context/specs/001-reduzir-custo-egress (fix definitivo: copiar R2→R2 sem AWS).
+# DESABILITADO 2026-06-24 (cutover): o pipeline migrou pro GitHub Actions
+# (.github/workflows/update-tiles.yml), que copia OpenFreeMap R2 → Alfaero R2 SEM
+# passar pela AWS — eliminando o egress AWS (~$30/mês). Mantido só pra rollback
+# rápido (basta state="ENABLED"). Ver ../alfaero-map-tiles_context/specs/001.
 resource "aws_cloudwatch_event_rule" "weekly" {
   name                = "alfaero-map-tiles-weekly"
-  description         = "Trigger pipeline alfaero-map-tiles first Sunday of each month 07:00 UTC"
-  schedule_expression = "cron(0 7 ? * SUN#1 *)"
+  description         = "DISABLED — pipeline migrado pro GitHub Actions (R2->R2, sem egress AWS)"
+  schedule_expression = "cron(0 7 1 * *)"
+  state               = "DISABLED"
 }
 
 resource "aws_iam_role" "eventbridge" {
