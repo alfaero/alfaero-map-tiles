@@ -56,6 +56,7 @@ fi
 #    sobe em multipart — não precisa do arquivo inteiro em disco, e não toca a AWS.
 log "copiando $SRC_URL → alfaero:${R2_BUCKET}/${PMTILES_NAME} ..."
 rclone copyto "ofm:${SRC_PATH}" "alfaero:${R2_BUCKET}/${PMTILES_NAME}" \
+  --s3-no-check-bucket \
   --s3-chunk-size 64M \
   --s3-upload-concurrency 8 \
   --s3-disable-checksum \
