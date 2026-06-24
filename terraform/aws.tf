@@ -220,11 +220,14 @@ resource "aws_sfn_state_machine" "weekly_update" {
   })
 }
 
-# EventBridge cron: Domingo 04:00 BRT = 07:00 UTC
+# EventBridge cron: 1º Domingo do mês 04:00 BRT = 07:00 UTC.
+# Mensal (não semanal): o mapa base OSM muda devagar e cada run sobe ~83 GB pro R2
+# (egress AWS ~$0.09/GB). Mensal corta ~75% do egress (~$22/mês). Ver
+# ../alfaero-map-tiles_context/specs/001-reduzir-custo-egress (fix definitivo: copiar R2→R2 sem AWS).
 resource "aws_cloudwatch_event_rule" "weekly" {
   name                = "alfaero-map-tiles-weekly"
-  description         = "Trigger pipeline alfaero-map-tiles every Sunday 07:00 UTC"
-  schedule_expression = "cron(0 7 ? * SUN *)"
+  description         = "Trigger pipeline alfaero-map-tiles first Sunday of each month 07:00 UTC"
+  schedule_expression = "cron(0 7 ? * SUN#1 *)"
 }
 
 resource "aws_iam_role" "eventbridge" {
