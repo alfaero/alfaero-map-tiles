@@ -7,20 +7,23 @@ services:
       - "127.0.0.1:8006:8080"
     volumes:
       - ./config.json:/data/config.json:ro
+      - ./guard.js:/data/guard.js:ro
       - ./styles:/data/styles:ro
       - ./sprites:/data/sprites:ro
       - ./mbtiles:/data/mbtiles:ro
     command: --config /data/config.json --no-cors
-    # Sem mbtiles local — styles apontam pro Worker XYZ (tiles.alfaero.com/tiles/...)
-    # TileServer GL renderiza MVT→PNG e cacheia em memória
+    labels:
+      - "autoheal=true"
     environment:
       - PORT=8080
       - MAX_SCALE_FACTOR=2
       - UV_THREADPOOL_SIZE=16
-      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_OPTIONS=--max-old-space-size=2048 --require /data/guard.js
+    # healthcheck real: a imagem nao tem wget/curl, usa node fetch de uma tile
+    # de style (exercita o pmtiles planet). Falha => autoheal reinicia.
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/styles/alfaero-day/0/0/0.png"]
-      interval: 30s
-      timeout: 5s
+      test: ["CMD", "node", "-e", "fetch(\"http://localhost:8080/styles/alfaero-night/5/12/18.png\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 60s
+      timeout: 20s
       retries: 3
-      start_period: 60s
+      start_period: 90s
