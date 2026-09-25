@@ -71,6 +71,12 @@ jobs:
       - name: Purge CDN (styles)
         run: bash pipeline/05-purge-cdn.sh
 
+      # Sem isto cada mes somava ~85 GB no R2. Nunca apaga planeta em uso (estilos
+      # publicados + o do tileserver raster, ver PROTECT_PMTILES no script) e
+      # mantem 1 versao anterior de reserva.
+      - name: Cleanup old planets
+        run: bash pipeline/06-cleanup.sh
+
       - name: Summary
         if: always()
         run: |
