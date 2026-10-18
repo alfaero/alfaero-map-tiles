@@ -59,9 +59,17 @@ echo "$STAMP" > probe.txt
 rclone copyto probe.txt "alfaero:alfaero-map-tiles/logs/obstacles-${STAMP}-probe.txt" || exit 3
 rm -f probe.txt
 
-curl -fsSL --retry 5 --retry-delay 30 -o sa.osm.pbf "$PBF_URL" || exit 5
-curl -fsSL --retry 5 -o sa.osm.pbf.md5 "$PBF_URL.md5" || exit 5
-[[ "$(md5sum sa.osm.pbf | cut -d' ' -f1)" == "$(cut -d' ' -f1 sa.osm.pbf.md5)" ]] || { echo "md5 do PBF nao confere"; exit 6; }
+# O Geofabrik troca o arquivo uma vez por dia: o md5 vem antes do PBF e, se
+# o arquivo mudou no meio do download, baixa de novo (até 3 vezes).
+ok=0
+for attempt in 1 2 3; do
+  curl -fsSL --retry 5 -o sa.osm.pbf.md5 "$PBF_URL.md5" || exit 5
+  curl -fsSL --retry 5 --retry-delay 30 -o sa.osm.pbf "$PBF_URL" || exit 5
+  if [[ "$(md5sum sa.osm.pbf | cut -d' ' -f1)" == "$(cut -d' ' -f1 sa.osm.pbf.md5)" ]]; then ok=1; break; fi
+  echo "md5 do PBF nao confere (tentativa $attempt)"
+  sleep 120
+done
+(( ok )) || exit 6
 
 # Mesmo filtro de obstacles/osm.py (OSMIUM_FILTERS).
 osmium tags-filter sa.osm.pbf \
