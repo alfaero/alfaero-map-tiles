@@ -5,7 +5,9 @@ teto de páginas e conferência da contagem do servidor contra o que veio.
 """
 from __future__ import annotations
 
+import json
 import math
+import sys
 import time
 
 SERVICE = "https://sigel.aneel.gov.br/arcgis/rest/services/PORTAL/Parques_E%C3%B3licos/MapServer"
@@ -92,3 +94,25 @@ def fetch_turbines(session, attempts=5, sleep=time.sleep, max_pages=None) -> lis
             "heading_deg": headings.get((a.get("NOME_EOL") or "").strip().lower()),
         })
     return out
+
+
+def main(argv=None) -> int:
+    """Baixa os aerogeradores para um JSON (`python -m obstacles.aneel saida.json`).
+
+    O SIGEL recusa conexão da VPS (timeout de conexão em 18/10), então o
+    launcher baixa daqui e envia o arquivo; o job usa `--aneel-json`.
+    """
+    import requests
+
+    out = (argv or sys.argv[1:])[0]
+    session = requests.Session()
+    session.headers["User-Agent"] = "alfaero-obstacles-job/1 (tiles.alfaero.com)"
+    turbines = fetch_turbines(session)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(turbines, f)
+    print(f"aneel: {len(turbines)} aerogeradores em {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

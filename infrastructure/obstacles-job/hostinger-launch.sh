@@ -22,6 +22,13 @@ done
 
 ssh -i "$KEY" "$HOST" 'mkdir -p /root/obstacles-job && cat > /root/obstacles-job/job.sh && chmod 700 /root/obstacles-job/job.sh' \
   < "$DIR/hostinger-job.sh"
+# Aerogeradores da ANEEL baixados daqui: o SIGEL não aceita conexão da VPS.
+ANEEL_JSON="$(mktemp)"
+(cd "$DIR" && python -m obstacles.aneel "$ANEEL_JSON")
+python -c "import json,sys; n=len(json.load(open(sys.argv[1]))); assert n > 12000, n" "$ANEEL_JSON"
+ssh -i "$KEY" "$HOST" 'cat > /root/obstacles-job/aneel-input.json' < "$ANEEL_JSON"
+rm -f "$ANEEL_JSON"
+
 # Pacote Python (sem testes): o job roda `python -m obstacles.build` dentro da pasta.
 tar -C "$DIR" -czf - --exclude='__pycache__' obstacles \
   | ssh -i "$KEY" "$HOST" 'rm -rf /root/obstacles-job/obstacles && tar -C /root/obstacles-job -xzf -'

@@ -80,8 +80,11 @@ osmium tags-filter sa.osm.pbf \
 ls -la sa.osm.pbf filtered.pbf
 rm -f sa.osm.pbf
 
+# A coleta da ANEEL vem do launcher (o SIGEL não aceita conexão da VPS); sem
+# o arquivo, tenta direto.
+if [[ -s aneel-input.json ]]; then ANEEL_ARGS=(--aneel-json aneel-input.json); else ANEEL_ARGS=(); fi
 venv/bin/python -m obstacles.build --osm-pbf filtered.pbf --stamp "$STAMP" \
-  --mbtiles out.mbtiles --save-aneel-json "aneel-${STAMP}.json" || exit 8
+  --mbtiles out.mbtiles "${ANEEL_ARGS[@]}" --save-aneel-json "aneel-${STAMP}.json" || exit 8
 venv/bin/python -m obstacles.check out.mbtiles --min-turbines "$MIN_TURBINES" || exit 9
 
 pmtiles convert out.mbtiles "$OUT" || exit 10
