@@ -1,0 +1,26 @@
+# Terreno da visão sintética do app (spec 005). Separado do tiles-worker de
+# propósito: arquivos, cache e rota próprios.
+name = "alfaero-terrain-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-02"
+minify = true
+account_id = "fd93a1d728c6d167cb0bb93a1ed584df"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "alfaero-map-tiles"
+preview_bucket_name = "alfaero-map-tiles"
+
+[vars]
+ALLOWED_ORIGINS = "*"
+# O GLO-30 é de 2021 e não muda: 30 dias e imutável. Uma regravação usa nome
+# de arquivo novo, então o cache nunca serve dado velho de outro arquivo.
+CACHE_CONTROL = "public, max-age=2592000, immutable"
+PLANET_PATH = "terrain-glo30-planet-z0-9-20261018.pmtiles"
+REGION_PATH = "terrain-glo30-sa-z0-11-20261018.pmtiles"
+REGION_MIN_ZOOM = "10"
+PUBLIC_HOSTNAME = "tiles.alfaero.com"
+
+[[routes]]
+pattern = "tiles.alfaero.com/terrain*"
+zone_name = "alfaero.com"

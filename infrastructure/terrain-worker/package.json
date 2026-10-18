@@ -1,0 +1,20 @@
+{
+  "name": "alfaero-terrain-worker",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230518.0",
+    "tsx": "^4.19.3",
+    "typescript": "^4.8.4",
+    "wrangler": "^4.59.1"
+  },
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "tsx src/routing.test.ts",
+    "build": "wrangler deploy --outdir dist --dry-run"
+  },
+  "dependencies": {
+    "pmtiles": "^4.3.0"
+  }
+}
