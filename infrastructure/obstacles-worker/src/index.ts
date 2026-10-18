@@ -1,7 +1,8 @@
 // Obstáculos da visão sintética do app (spec 006; formato AOB1 da spec 389 do
 // alfaero-mobile) em tiles.alfaero.com/obstacles/{versao}/{z}/{x}/{y}.bin.
-// Um PMTiles por base no R2. Tile sem obstáculo devolve 204; versão que não
-// existe devolve 404 (sem cache).
+// Um PMTiles por base no R2. Tile sem obstáculo devolve 204. Base que ainda
+// não está no R2 devolve 503 sem cache: o app trata 404 e 204 como "sem
+// obstáculo" e gravaria o vazio como base atual; 503 ele tenta de novo depois.
 import {
   EtagMismatch,
   PMTiles,
@@ -79,10 +80,11 @@ export default {
     const respond = (body: ArrayBuffer | string | undefined, type: string | null, status: number) => {
       const h = new Headers();
       if (type) h.set("Content-Type", type);
-      h.set("Cache-Control", env.CACHE_CONTROL || "public, max-age=86400");
+      const cacheable = status === 200 || status === 204;
+      h.set("Cache-Control", cacheable ? env.CACHE_CONTROL || "public, max-age=86400" : "no-store");
       const r = new Response(body, { headers: h, status });
-      // 404 de base ausente não fica preso no cache.
-      if (status === 200 || status === 204) ctx.waitUntil(cache.put(request.url, r.clone()));
+      // Erro não fica preso no cache.
+      if (cacheable) ctx.waitUntil(cache.put(request.url, r.clone()));
       return withCors(r);
     };
 
@@ -111,7 +113,7 @@ export default {
       if (!tile) return respond(undefined, null, 204);
       return respond(tile.data, "application/octet-stream", 200);
     } catch (e) {
-      if (e instanceof KeyNotFoundError) return respond("Archive not found", "text/plain", 404);
+      if (e instanceof KeyNotFoundError) return respond("Archive not available", "text/plain", 503);
       throw e;
     }
   },
