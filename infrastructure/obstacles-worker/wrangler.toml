@@ -1,0 +1,22 @@
+# Obstáculos da visão sintética do app (spec 006). Separado do terreno de
+# propósito: arquivo, cache e rota próprios.
+name = "alfaero-obstacles-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-02"
+minify = true
+account_id = "fd93a1d728c6d167cb0bb93a1ed584df"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "alfaero-map-tiles"
+preview_bucket_name = "alfaero-map-tiles"
+
+[vars]
+ALLOWED_ORIGINS = "*"
+# A versão vai no caminho: cada base é uma URL nova, então o cache é imutável.
+CACHE_CONTROL = "public, max-age=2592000, immutable"
+PUBLIC_HOSTNAME = "tiles.alfaero.com"
+
+[[routes]]
+pattern = "tiles.alfaero.com/obstacles*"
+zone_name = "alfaero.com"
