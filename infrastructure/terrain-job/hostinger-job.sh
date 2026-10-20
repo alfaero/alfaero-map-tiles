@@ -30,6 +30,8 @@ fi
 
 finish() {
   [[ -n "${GUARD:-}" ]] && kill "$GUARD" 2>/dev/null
+  # O teto de tempo também sai: vivo, ele mandaria TERM a um PID já reusado.
+  if [[ -n "${TIMER:-}" ]]; then pkill -P "$TIMER" 2>/dev/null; kill "$TIMER" 2>/dev/null; fi
   echo "=== TERRAIN END $(date -u +%FT%TZ) status=${STATUS} ==="
   rclone copyto "$LOG" "alfaero:alfaero-map-tiles/logs/terrain-${STAMP}-${STATUS}.log" \
     --header-upload "Content-Type: text/plain" || true
@@ -53,6 +55,7 @@ GUARD=$!
 
 # Teto de tempo: 6 horas.
 ( sleep 21600; echo "TIMEOUT"; kill -TERM $$ ) &
+TIMER=$!
 
 # Confere leitura e escrita no R2 antes de baixar 16 GB.
 echo "$STAMP" > probe.txt
