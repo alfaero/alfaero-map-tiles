@@ -4,8 +4,13 @@
 # do processo remoto. Acompanhar: ssh ... tail -f /root/terrain-job/terrain-<STAMP>.log
 #
 # Uso: bash infrastructure/terrain-job/hostinger-launch.sh [AAAAMMDD]
+#   Só uma região (spec 007), de z10 a z11:
+#   bash infrastructure/terrain-job/hostinger-launch.sh 20261020 na -170,7,-52,72
 set -euo pipefail
 STAMP="${1:-20261018}"
+REGION_NAME="${2:-}"
+REGION_BBOX="${3:-}"
+if [[ -n "$REGION_NAME" && -z "$REGION_BBOX" ]]; then echo "região sem bbox" >&2; exit 1; fi
 DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST="root@2.25.136.129"
 KEY="$HOME/.ssh/alfaero_hostinger"
@@ -26,6 +31,9 @@ ssh -i "$KEY" "$HOST" 'mkdir -p /root/terrain-job && cat > /root/terrain-job/job
 # As chaves vão pela entrada padrão, nunca pela linha de comando (ps).
 {
   printf 'export STAMP=%q\n' "$STAMP"
+  if [[ -n "$REGION_NAME" ]]; then
+    printf 'export REGION_NAME=%q REGION_BBOX=%q REGION_MINZOOM=10\n' "$REGION_NAME" "$REGION_BBOX"
+  fi
   # A chave do R2 não cria bucket: sem NO_CHECK_BUCKET o rclone tenta e leva 403.
   printf 'export RCLONE_CONFIG_ALFAERO_TYPE=s3 RCLONE_CONFIG_ALFAERO_PROVIDER=Cloudflare RCLONE_CONFIG_ALFAERO_NO_CHECK_BUCKET=true\n'
   printf 'export RCLONE_CONFIG_ALFAERO_ENDPOINT=%q\n' "$(field R2_ENDPOINT)"

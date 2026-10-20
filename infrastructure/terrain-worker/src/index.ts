@@ -1,7 +1,7 @@
 // Terreno Terrarium (Copernicus GLO-30 via Mapterhorn) em
 // tiles.alfaero.com/terrain/{z}/{x}/{y}.webp, para a visão sintética do app
-// (spec 005). Dois arquivos PMTiles no R2: o planeta até z9 e a América do Sul
-// de z10 em diante. Tile sem dado devolve 204: o app trata como "sem dado",
+// (spec 005). Arquivos PMTiles no R2: o planeta até z9 e, de z10 em diante,
+// as regiões detalhadas (América do Sul e do Norte, spec 007). Tile sem dado devolve 204: o app trata como "sem dado",
 // nunca como 0 m.
 import {
   EtagMismatch,
@@ -11,7 +11,7 @@ import {
   type Source,
   TileType,
 } from "pmtiles";
-import { ATTRIBUTION, archiveFor, parseTerrainPath } from "./routing";
+import { ATTRIBUTION, archivesFor, extentCovers, parseTerrainPath } from "./routing";
 
 interface Env {
   // biome-ignore lint: config name
@@ -23,7 +23,7 @@ interface Env {
   // biome-ignore lint: config name
   PLANET_PATH: string;
   // biome-ignore lint: config name
-  REGION_PATH: string;
+  REGION_PATHS: string;
   // biome-ignore lint: config name
   REGION_MIN_ZOOM: string;
   // biome-ignore lint: config name
@@ -111,17 +111,19 @@ export default {
         return respond(JSON.stringify(json), "application/json", 200);
       }
 
-      const p = new PMTiles(new R2Source(env, archiveFor(route.z, env)), CACHE);
-      const h = await p.getHeader();
-      if (h.tileType !== TileType.Webp) {
-        return respond("Archive is not WebP", "text/plain", 500);
+      // A primeira região que tem o tile responde; o cabeçalho (em cache) já
+      // descarta as que nem cobrem o lugar.
+      for (const path of archivesFor(route.z, env)) {
+        const p = new PMTiles(new R2Source(env, path), CACHE);
+        const h = await p.getHeader();
+        if (h.tileType !== TileType.Webp) {
+          return respond("Archive is not WebP", "text/plain", 500);
+        }
+        if (!extentCovers(h, route.z, route.x, route.y)) continue;
+        const tile = await p.getZxy(route.z, route.x, route.y);
+        if (tile) return respond(tile.data, "image/webp", 200);
       }
-      if (route.z < h.minZoom || route.z > h.maxZoom) {
-        return respond(undefined, null, 204);
-      }
-      const tile = await p.getZxy(route.z, route.x, route.y);
-      if (!tile) return respond(undefined, null, 204);
-      return respond(tile.data, "image/webp", 200);
+      return respond(undefined, null, 204);
     } catch (e) {
       if (e instanceof KeyNotFoundError) return respond("Archive not found", "text/plain", 404);
       throw e;

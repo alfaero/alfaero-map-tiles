@@ -17,12 +17,37 @@ export function parseTerrainPath(path: string): TerrainRoute {
   return { kind: "tile", z, x, y };
 }
 
-/** Arquivo que serve o zoom: o planeta até z9, a região de z10 em diante. */
-export function archiveFor(
+/** Arquivos que servem o zoom, na ordem de consulta: o planeta até z9, as
+ * regiões (REGION_PATHS, separadas por vírgula) de z10 em diante (spec 007). */
+export function archivesFor(
   z: number,
-  env: { PLANET_PATH: string; REGION_PATH: string; REGION_MIN_ZOOM: string }
-): string {
-  return z >= Number(env.REGION_MIN_ZOOM) ? env.REGION_PATH : env.PLANET_PATH;
+  env: { PLANET_PATH: string; REGION_PATHS: string; REGION_MIN_ZOOM: string }
+): string[] {
+  if (z < Number(env.REGION_MIN_ZOOM)) return [env.PLANET_PATH];
+  return env.REGION_PATHS.split(",").map((p) => p.trim()).filter((p) => p);
+}
+
+/** Limites e zooms de um arquivo, como vêm no cabeçalho do PMTiles. */
+export interface ArchiveExtent {
+  minZoom: number;
+  maxZoom: number;
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
+/** O arquivo pode ter o tile: zoom dentro e o tile encosta nos limites. Evita
+ * ler o diretório de uma região que nem cobre o lugar. */
+export function extentCovers(e: ArchiveExtent, z: number, x: number, y: number): boolean {
+  if (z < e.minZoom || z > e.maxZoom) return false;
+  const n = 2 ** z;
+  const lat = (row: number) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * row) / n))) * 180) / Math.PI;
+  const west = (x / n) * 360 - 180;
+  const east = ((x + 1) / n) * 360 - 180;
+  const north = lat(y);
+  const south = lat(y + 1);
+  return east > e.minLon && west < e.maxLon && north > e.minLat && south < e.maxLat;
 }
 
 /** Atribuição exigida pela licença do Copernicus e o crédito do Mapterhorn. */

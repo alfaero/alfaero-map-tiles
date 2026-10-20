@@ -17,7 +17,8 @@ ALLOWED_ORIGINS = "*"
 # de arquivo novo, então o cache nunca serve dado velho de outro arquivo.
 CACHE_CONTROL = "public, max-age=2592000, immutable"
 PLANET_PATH = "terrain-glo30-planet-z0-9-20261018.pmtiles"
-REGION_PATH = "terrain-glo30-sa-z0-11-20261018.pmtiles"
+# Regiões de z10 em diante, na ordem de consulta (spec 007).
+REGION_PATHS = "terrain-glo30-sa-z0-11-20261018.pmtiles,terrain-glo30-na-z10-11-20261020.pmtiles"
 REGION_MIN_ZOOM = "10"
 PUBLIC_HOSTNAME = "tiles.alfaero.com"
 

@@ -5,6 +5,9 @@
 # (variáveis RCLONE_CONFIG_ALFAERO_*) e nunca é gravada em disco.
 #
 # Não rode direto: use hostinger-launch.sh, que envia este script e as chaves.
+#
+# Modo de região (spec 007): com REGION_NAME, REGION_BBOX e REGION_MINZOOM no
+# ambiente o job recorta só essa região (até z11) e sobe só esse arquivo.
 set -o pipefail
 STAMP="${STAMP:?}"
 SRC="https://download.mapterhorn.com/planet.pmtiles"
@@ -20,6 +23,10 @@ ionice -c 3 -p $$
 
 PLANET="terrain-glo30-planet-z0-9-${STAMP}.pmtiles"
 SA="terrain-glo30-sa-z0-11-${STAMP}.pmtiles"
+if [[ -n "${REGION_NAME:-}" ]]; then
+  REGION="terrain-glo30-${REGION_NAME}-z${REGION_MINZOOM:?}-11-${STAMP}.pmtiles"
+  : "${REGION_BBOX:?}"
+fi
 
 finish() {
   [[ -n "${GUARD:-}" ]] && kill "$GUARD" 2>/dev/null
@@ -52,18 +59,25 @@ echo "$STAMP" > probe.txt
 rclone copyto probe.txt "alfaero:alfaero-map-tiles/logs/terrain-${STAMP}-probe.txt" || exit 3
 rm -f probe.txt
 
-pmtiles extract "$SRC" "$PLANET" --maxzoom=9 --download-threads=4 || exit 5
-pmtiles extract "$SRC" "$SA" --bbox=-82,-56,-34,13 --maxzoom=11 --download-threads=4 || exit 6
-pmtiles verify "$PLANET" || exit 7
-pmtiles verify "$SA" || exit 8
-pmtiles show "$PLANET"
-pmtiles show "$SA"
+if [[ -n "${REGION:-}" ]]; then
+  FILES=("$REGION")
+  pmtiles extract "$SRC" "$REGION" --bbox="$REGION_BBOX" --minzoom="$REGION_MINZOOM" --maxzoom=11 \
+    --download-threads=4 || exit 6
+else
+  FILES=("$PLANET" "$SA")
+  pmtiles extract "$SRC" "$PLANET" --maxzoom=9 --download-threads=4 || exit 5
+  pmtiles extract "$SRC" "$SA" --bbox=-82,-56,-34,13 --maxzoom=11 --download-threads=4 || exit 6
+fi
+for f in "${FILES[@]}"; do
+  pmtiles verify "$f" || exit 8
+  pmtiles show "$f"
+done
 ls -la "$WORK"
-sha256sum "$PLANET" "$SA" | tee sha256.txt
+sha256sum "${FILES[@]}" | tee sha256.txt
 
-for f in "$PLANET" "$SA"; do
+for f in "${FILES[@]}"; do
   rclone copyto "$f" "alfaero:alfaero-map-tiles/$f" \
     --s3-chunk-size 64M --s3-upload-concurrency 4 --bwlimit 25M --stats 60s || exit 9
 done
-rclone copyto sha256.txt "alfaero:alfaero-map-tiles/terrain-glo30-${STAMP}.sha256" || exit 10
+rclone copyto sha256.txt "alfaero:alfaero-map-tiles/terrain-glo30-${REGION_NAME:+${REGION_NAME}-}${STAMP}.sha256" || exit 10
 STATUS="SUCCESS"
