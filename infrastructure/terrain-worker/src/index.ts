@@ -11,7 +11,7 @@ import {
   type Source,
   TileType,
 } from "pmtiles";
-import { ATTRIBUTION, archivesFor, extentCovers, parseTerrainPath } from "./routing";
+import { ATTRIBUTION, archivesFor, cacheKeyFor, extentCovers, parseTerrainPath } from "./routing";
 
 interface Env {
   // biome-ignore lint: config name
@@ -81,7 +81,10 @@ export default {
     };
 
     const cache = caches.default;
-    const cached = await cache.match(request.url);
+    // A chave muda junto com os arquivos: região nova não fica escondida por
+    // um 204 guardado antes dela (spec 007).
+    const key = cacheKeyFor(request.url, env);
+    const cached = await cache.match(key);
     if (cached) return withCors(cached);
 
     const respond = (body: ArrayBuffer | string | undefined, type: string | null, status: number) => {
@@ -90,7 +93,7 @@ export default {
       h.set("Cache-Control", env.CACHE_CONTROL || "public, max-age=86400");
       const r = new Response(body, { headers: h, status });
       // 404 de arquivo ausente não fica preso no cache.
-      if (status === 200 || status === 204) ctx.waitUntil(cache.put(request.url, r.clone()));
+      if (status === 200 || status === 204) ctx.waitUntil(cache.put(key, r.clone()));
       return withCors(r);
     };
 

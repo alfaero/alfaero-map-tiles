@@ -27,6 +27,25 @@ export function archivesFor(
   return env.REGION_PATHS.split(",").map((p) => p.trim()).filter((p) => p);
 }
 
+/** Chave do cache da borda: a URL mais uma assinatura dos arquivos servidos.
+ * Trocar ou acrescentar um arquivo muda a chave, e o que estava guardado
+ * (inclusive 204 de região que ainda não existia) deixa de valer sem purga. */
+export function cacheKeyFor(url: string, env: { PLANET_PATH: string; REGION_PATHS: string }): string {
+  const u = new URL(url);
+  u.search = "";
+  u.searchParams.set("a", fnv1a(`${env.PLANET_PATH}|${env.REGION_PATHS}`));
+  return u.toString();
+}
+
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 /** Limites e zooms de um arquivo, como vêm no cabeçalho do PMTiles. */
 export interface ArchiveExtent {
   minZoom: number;

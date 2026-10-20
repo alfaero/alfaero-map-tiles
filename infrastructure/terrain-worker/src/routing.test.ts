@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ATTRIBUTION, archivesFor, extentCovers, parseTerrainPath } from "./routing";
+import { ATTRIBUTION, archivesFor, cacheKeyFor, extentCovers, parseTerrainPath } from "./routing";
 
 const env = { PLANET_PATH: "p.pmtiles", REGION_PATHS: "sa.pmtiles, na.pmtiles", REGION_MIN_ZOOM: "10" };
 
@@ -35,6 +35,16 @@ assert.equal(extentCovers(na, 12, 860, 1554), false);
 // Europa (11/1024/700): em nenhuma das duas, segue 204.
 assert.equal(extentCovers(sa, 11, 1024, 700), false);
 assert.equal(extentCovers(na, 11, 1024, 700), false);
+
+// Chave do cache: muda com os arquivos, igual para os mesmos arquivos, sem
+// carregar a query do pedido.
+const tileUrl = "https://tiles.alfaero.com/terrain/11/428/776.webp";
+const before = cacheKeyFor(tileUrl, { ...env, REGION_PATHS: "sa.pmtiles" });
+const after = cacheKeyFor(tileUrl, env);
+assert.notEqual(before, after, "região nova muda a chave");
+assert.equal(cacheKeyFor(tileUrl, env), after);
+assert.equal(cacheKeyFor(`${tileUrl}?x=1`, env), after);
+assert.match(after, /^https:\/\/tiles\.alfaero\.com\/terrain\/11\/428\/776\.webp\?a=[0-9a-f]{8}$/);
 
 assert.match(ATTRIBUTION, /Copernicus WorldDEM-30/);
 assert.match(ATTRIBUTION, /Mapterhorn/);
