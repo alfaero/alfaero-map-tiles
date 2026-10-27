@@ -20,3 +20,4 @@ fonts/*.pbf
 sprites/alfaero/*.png
 sprites/alfaero/*.json
 !sprites/alfaero/README.md
+__pycache__/

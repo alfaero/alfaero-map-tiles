@@ -1,0 +1,17 @@
+tif,tipo,x,y,x1,y1,motivo
+Bethel SEC.tif,manter,1222,9056,,,aba legítima do mapa: Hall Island desenhada fora do neatline oeste
+Hawaiian Islands SEC.tif,manter,15571,14695,,,canto da carta girada (a abertura 61x61 apara cantos não alinhados aos eixos)
+Hawaiian Islands SEC.tif,manter,18571,10241,,,canto da carta girada
+Hawaiian Islands SEC.tif,manter,1874,5493,,,canto da carta girada
+Hawaiian Islands SEC.tif,manter,4875,1039,,,canto da carta girada
+Montreal SEC.tif,manter,17005,18,,,canto nordeste do mapa (Canadá em cinza) cortado na diagonal
+Montreal SEC.tif,manter,17824,40,,,canto nordeste do mapa (Canadá em cinza)
+Seward SEC.tif,incluir,17350,0,99999,4550,"mapa (Canadá, neve branca) até a borda leste da imagem, sem neatline; o preenchimento do colar entra pela neve"
+Anchorage SEC.tif,incluir,16250,10150,99999,10880,"canto sudeste: mapa com neve até a borda da imagem, acima do neatline sul"
+Kodiak SEC.tif,excluir,0,4260,1474,5105,"caixa do índice das cartas do Alasca encostada no neatline oeste (neatline em x=1476-1478; bordas da caixa y=4267-4269 e 5097-5099)"
+Juneau SEC.tif,excluir,0,3270,1470,3620,faixa azul do título (Federal Aviation Administration) encostada no mar do mapa
+Juneau SEC.tif,excluir,0,4190,1463,5060,caixa do índice das cartas do Alasca (borda direita em x=1456-1459) encostada no mar do mapa
+Cheyenne SEC.tif,excluir,1500,760,2280,1012,"caixa de aviso do colar (borda grossa y=773-781 e 993-1001, x=1546-2271) que invade uns 80 px do mapa; a Salt Lake City cobre essa faixa"
+Twin Cities SEC.tif,excluir,2000,720,2730,855,caixa de texto do colar encostada no neatline oeste (neatline em x=2734-2746; bordas y=727-728 e 847-848)
+Seattle SEC.tif,excluir,2100,4090,2549,5000,"caixas de texto do colar encostadas no neatline oeste (neatline em x=2551-2557)"
+Kodiak SEC.tif,excluir,0,3240,1552,3550,"faixa azul do título (Federal Aviation Administration) encostada no neatline oeste (bordas y=3244 a 3548, direita x~1555)"
