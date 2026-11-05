@@ -14,6 +14,7 @@ MIN_MEASURED_HEIGHT_M = 15.0
 # via do OSM e aerogerador da ANEEL em faixas próprias.
 OSM_WAY_ID_BASE = 1 << 59
 ANEEL_ID_BASE = 1 << 60
+NATS_ID_BASE = 1 << 61
 
 
 @dataclass
@@ -186,6 +187,45 @@ def merge_aneel(base: Base, turbines: list[dict], match_radius_m: float = 60) ->
         stats["built" if status == "built" else "confirmed"] += 1
         oid = ANEEL_ID_BASE + int(t["id"])
         base.obstacles[oid] = Obstacle(oid, t["lat"], t["lon"], aob.WIND_TURBINE, h, t.get("heading_deg"))
+    return stats
+
+
+# Tipos do OSM que podem ser a mesma estrutura de um obstáculo da NATS.
+_NATS_TWIN_TYPES = {
+    aob.WIND_TURBINE: {aob.WIND_TURBINE},
+    aob.TRANSMISSION_TOWER: {aob.TRANSMISSION_TOWER},
+    aob.TELECOM_TOWER: {aob.TELECOM_TOWER, aob.MAST, aob.GENERIC},
+    aob.CHIMNEY: {aob.CHIMNEY},
+    aob.GENERIC: set(),  # guindaste, prédio, ponte: não substitui nada, entra ao lado
+}
+
+
+def merge_nats(base: Base, items: list[dict], match_radius_m: float = 60) -> dict[str, int]:
+    """Junta os obstáculos oficiais da NATS (altura medida) na base do OSM.
+
+    Par do OSM a menos de `match_radius_m` e de tipo compatível sai e fica o da NATS.
+    Exceção: vértice de linha de transmissão continua (sem ele o fio perde a ponta) e só
+    recebe a altura medida da NATS. Sem par, o da NATS entra novo.
+    """
+    # Célula de 0,002 grau: mesmo a 60N (Shetland) tem ~111 m de largura, maior que o raio.
+    grid = _Grid(cell=0.002)
+    for o in base.obstacles.values():
+        grid.add(o)
+    on_lines = {n for line in base.lines for n in line.nodes}
+    stats = {"added": 0, "replaced": 0, "line_vertex_updated": 0}
+    for it in items:
+        compatible = _NATS_TWIN_TYPES.get(it["type"], set())
+        twins = [o for o in grid.near(it["lat"], it["lon"], match_radius_m)
+                 if o.type in compatible and o.id in base.obstacles]
+        vertex = next((o for o in twins if o.id in on_lines), None)
+        if vertex is not None:
+            vertex.height_m = it["height_m"]
+            stats["line_vertex_updated"] += 1
+            continue
+        for o in twins:
+            base.obstacles.pop(o.id, None)
+        stats["replaced" if twins else "added"] += 1
+        base.obstacles[it["id"]] = Obstacle(it["id"], it["lat"], it["lon"], it["type"], it["height_m"])
     return stats
 
 

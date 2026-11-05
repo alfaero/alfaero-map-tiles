@@ -14,10 +14,10 @@ import sys
 
 import requests
 
-from . import aneel, osm, tiling
-from .model import drop_low_measured, merge_aneel
+from . import aneel, nats, osm, tiling
+from .model import drop_low_measured, merge_aneel, merge_nats
 
-ATTRIBUTION = "ANEEL SIGEL; (c) OpenStreetMap contributors; ODbL"
+ATTRIBUTION = "ANEEL SIGEL; NATS (UK AIS); (c) OpenStreetMap contributors; ODbL"
 
 
 def main(argv=None) -> int:
@@ -28,6 +28,7 @@ def main(argv=None) -> int:
     p.add_argument("--stamp", type=int, required=True, help="AAAAMMDD da base")
     p.add_argument("--aneel-json", help="usa a coleta guardada em vez de baixar")
     p.add_argument("--save-aneel-json")
+    p.add_argument("--nats-xml", help="obstáculos oficiais do Reino Unido (python -m obstacles.nats --download)")
     p.add_argument("--mbtiles")
     p.add_argument("--tiles-dir", help="grava {z}/{x}/{y}.bin (amostra e teste)")
     a = p.parse_args(argv)
@@ -58,6 +59,13 @@ def main(argv=None) -> int:
         turbines = [t for t in turbines if s <= t["lat"] <= n and w <= t["lon"] <= e]
     # A1: o log diz quantos entraram e por que os outros ficaram fora.
     print("aneel juncao:", merge_aneel(base, turbines))
+    if a.nats_xml:
+        items, read = nats.parse_obstacles(a.nats_xml)
+        if bbox:
+            s, w, n, e = bbox
+            items = [i for i in items if s <= i["lat"] <= n and w <= i["lon"] <= e]
+        print(f"nats: {len(items)} obstaculos ({read})")
+        print("nats juncao:", merge_nats(base, items))
     print("baixos descartados:", drop_low_measured(base))
 
     tiles = tiling.build_tiles(base, a.stamp)
