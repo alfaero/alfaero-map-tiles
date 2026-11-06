@@ -23,8 +23,14 @@ done
 ssh -i "$KEY" "$HOST" 'mkdir -p /root/obstacles-job && cat > /root/obstacles-job/job.sh && chmod 700 /root/obstacles-job/job.sh' \
   < "$DIR/hostinger-job.sh"
 # Aerogeradores da ANEEL baixados daqui: o SIGEL não aceita conexão da VPS.
+# Com o SIGEL fora do ar, ANEEL_SAVED=<arquivo> usa uma coleta guardada (sources/aneel-*.json no R2).
 ANEEL_JSON="$(mktemp)"
-(cd "$DIR" && python -m obstacles.aneel "$ANEEL_JSON")
+if [[ -n "${ANEEL_SAVED:-}" ]]; then
+  cp "$ANEEL_SAVED" "$ANEEL_JSON"
+  echo "ANEEL: coleta guardada $ANEEL_SAVED"
+else
+  (cd "$DIR" && python -m obstacles.aneel "$ANEEL_JSON")
+fi
 python -c "import json,sys; n=len(json.load(open(sys.argv[1]))); assert n > 12000, n" "$ANEEL_JSON"
 ssh -i "$KEY" "$HOST" 'cat > /root/obstacles-job/aneel-input.json' < "$ANEEL_JSON"
 rm -f "$ANEEL_JSON"

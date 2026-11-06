@@ -15,6 +15,8 @@ MIN_MEASURED_HEIGHT_M = 15.0
 OSM_WAY_ID_BASE = 1 << 59
 ANEEL_ID_BASE = 1 << 60
 NATS_ID_BASE = 1 << 61
+# Obstáculos oficiais da DFS (Alemanha): faixa logo acima da NATS (a NATS usa 48 bits a partir de 2^61).
+DFS_ID_BASE = NATS_ID_BASE + (1 << 50)
 
 
 @dataclass

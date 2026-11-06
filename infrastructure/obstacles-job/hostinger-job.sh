@@ -8,10 +8,13 @@
 # Python e as chaves.
 set -o pipefail
 STAMP="${STAMP:?}"
-# América do Sul + Reino Unido (a Irlanda do Norte está no PBF da Irlanda, não no da Grã-Bretanha).
+# América do Sul + Reino Unido + Alemanha (a Irlanda do Norte está no PBF da Irlanda, não no da
+# Grã-Bretanha). O PBF da Alemanha tem ~4,5 GB: um por vez, filtrado e apagado (disco).
 PBF_URLS=(
   "https://download.geofabrik.de/south-america-latest.osm.pbf"
   "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf"
+  # A Alemanha o Geofabrik serve pelo espelho da GWDG (o endereço normal redireciona e não tem .md5).
+  "https://ftp5.gwdg.de/pub/misc/openstreetmap/download.geofabrik.de/germany-latest.osm.pbf"
   "https://download.geofabrik.de/europe/ireland-and-northern-ireland-latest.osm.pbf"
 )
 WORK="/root/obstacles-job"
@@ -22,6 +25,9 @@ MAX_DISK_PCT=85
 MIN_TURBINES=20000
 # Obstáculos oficiais da NATS na base (10.566 no ciclo de 29/10/2026).
 MIN_NATS=9000
+# Obstáculos oficiais da DFS na base (26.154 partes no ciclo de 29/10/2026, 30.821 aerogeradores
+# contados por tipo de parte; o piso deixa folga para a junção com o OSM e o corte de altura).
+MIN_DFS=20000
 STATUS="FAILED"
 mkdir -p "$WORK" && cd "$WORK" || exit 4
 exec > >(tee -a "$LOG") 2>&1
@@ -36,7 +42,7 @@ finish() {
   echo "=== OBSTACLES END $(date -u +%FT%TZ) status=${STATUS} ==="
   rclone copyto "$LOG" "alfaero:alfaero-map-tiles/logs/obstacles-${STAMP}-${STATUS}.log" \
     --header-upload "Content-Type: text/plain" || true
-  rm -f "$WORK"/*.pbf "$WORK"/*.pmtiles "$WORK"/*.mbtiles "$WORK"/sha256.txt "$WORK"/nats-obstacles.xml
+  rm -f "$WORK"/*.pbf "$WORK"/*.pmtiles "$WORK"/*.mbtiles "$WORK"/sha256.txt "$WORK"/nats-obstacles.xml "$WORK"/dfs-obstacles.xml
 }
 trap finish EXIT
 
@@ -98,14 +104,16 @@ rm -f filtered-*.pbf
 
 # Obstáculos oficiais do Reino Unido (NATS), conferidos pelo SHA-256 do próprio zip.
 venv/bin/python -m obstacles.nats --download nats-obstacles.xml || exit 17
+# Obstáculos oficiais da Alemanha (DFS, CC BY 4.0), conferidos pelo SHA-512 do metadado.
+venv/bin/python -m obstacles.dfs --download dfs-obstacles.xml || exit 18
 
 # A coleta da ANEEL vem do launcher (o SIGEL não aceita conexão da VPS); sem
 # o arquivo, tenta direto.
 if [[ -s aneel-input.json ]]; then ANEEL_ARGS=(--aneel-json aneel-input.json); else ANEEL_ARGS=(); fi
 venv/bin/python -m obstacles.build --osm-pbf filtered.pbf --stamp "$STAMP" \
   --mbtiles out.mbtiles "${ANEEL_ARGS[@]}" --save-aneel-json "aneel-${STAMP}.json" \
-  --nats-xml nats-obstacles.xml || exit 8
-venv/bin/python -m obstacles.check out.mbtiles --min-turbines "$MIN_TURBINES" --min-nats "$MIN_NATS" || exit 9
+  --nats-xml nats-obstacles.xml --dfs-xml dfs-obstacles.xml || exit 8
+venv/bin/python -m obstacles.check out.mbtiles --min-turbines "$MIN_TURBINES" --min-nats "$MIN_NATS" --min-dfs "$MIN_DFS" || exit 9
 
 pmtiles convert out.mbtiles "$OUT" || exit 10
 pmtiles verify "$OUT" || exit 10

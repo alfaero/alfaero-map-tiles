@@ -14,10 +14,10 @@ import sys
 
 import requests
 
-from . import aneel, nats, osm, tiling
+from . import aneel, dfs, nats, osm, tiling
 from .model import drop_low_measured, merge_aneel, merge_nats
 
-ATTRIBUTION = "ANEEL SIGEL; NATS (UK AIS); (c) OpenStreetMap contributors; ODbL"
+ATTRIBUTION = "ANEEL SIGEL; NATS (UK AIS); DFS Deutsche Flugsicherung GmbH (CC BY 4.0); (c) OpenStreetMap contributors; ODbL"
 
 
 def main(argv=None) -> int:
@@ -29,6 +29,7 @@ def main(argv=None) -> int:
     p.add_argument("--aneel-json", help="usa a coleta guardada em vez de baixar")
     p.add_argument("--save-aneel-json")
     p.add_argument("--nats-xml", help="obstáculos oficiais do Reino Unido (python -m obstacles.nats --download)")
+    p.add_argument("--dfs-xml", help="obstáculos oficiais da Alemanha (python -m obstacles.dfs --download)")
     p.add_argument("--mbtiles")
     p.add_argument("--tiles-dir", help="grava {z}/{x}/{y}.bin (amostra e teste)")
     a = p.parse_args(argv)
@@ -66,6 +67,14 @@ def main(argv=None) -> int:
             items = [i for i in items if s <= i["lat"] <= n and w <= i["lon"] <= e]
         print(f"nats: {len(items)} obstaculos ({read})")
         print("nats juncao:", merge_nats(base, items))
+    if a.dfs_xml:
+        items, read = dfs.parse_obstacles(a.dfs_xml)
+        if bbox:
+            s, w, n, e = bbox
+            items = [i for i in items if s <= i["lat"] <= n and w <= i["lon"] <= e]
+        print(f"dfs: {len(items)} obstaculos ({read})")
+        # Mesma regra da NATS: altura medida oficial vence o par compatível do OSM a menos de 60 m.
+        print("dfs juncao:", merge_nats(base, items))
     print("baixos descartados:", drop_low_measured(base))
 
     tiles = tiling.build_tiles(base, a.stamp)

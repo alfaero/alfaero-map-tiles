@@ -26,6 +26,7 @@ export function archiveFor(version: string): string {
   return `obstacles-sa-z10-${version}.pmtiles`;
 }
 
-/** ANEEL, NATS (Reino Unido) e a licença ODbL do OSM (spec 389, AC22; spec 003 do navdata, CA13). */
+/** ANEEL, NATS (Reino Unido), DFS (Alemanha, CC BY 4.0) e a licença ODbL do OSM (spec 389, AC22;
+ * spec 003 do navdata, CA13; spec 005 do navdata, CA15). */
 export const ATTRIBUTION =
-  'Aerogeradores: ANEEL SIGEL. Reino Unido: NATS (UK AIS). Linhas, torres e mastros: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Bases sob a Open Database License (ODbL).';
+  'Aerogeradores: ANEEL SIGEL. Reino Unido: NATS (UK AIS). Alemanha: DFS Deutsche Flugsicherung GmbH, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Linhas, torres e mastros: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Bases sob a Open Database License (ODbL).';

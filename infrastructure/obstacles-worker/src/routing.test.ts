@@ -18,5 +18,7 @@ assert.equal(parseObstaclesPath("/obstacles/../terrain/11/1/1.bin").kind, "inval
 assert.equal(archiveFor("20261018"), "obstacles-sa-z10-20261018.pmtiles");
 assert.match(ATTRIBUTION, /ANEEL/);
 assert.match(ATTRIBUTION, /NATS/);
+assert.match(ATTRIBUTION, /DFS Deutsche Flugsicherung GmbH/);
+assert.match(ATTRIBUTION, /creativecommons\.org\/licenses\/by\/4\.0/);
 assert.match(ATTRIBUTION, /OpenStreetMap/);
 console.log("routing ok");
